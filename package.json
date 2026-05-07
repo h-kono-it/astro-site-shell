@@ -1,6 +1,6 @@
 {
   "name": "astro-site-shell",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A CLI-style terminal widget for Astro sites",
   "type": "module",
   "exports": {
