@@ -1,0 +1,24 @@
+{
+  "name": "astro-site-shell",
+  "version": "0.1.0",
+  "description": "A CLI-style terminal widget for Astro sites",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "keywords": [
+    "astro",
+    "astro-component",
+    "terminal",
+    "cli",
+    "shell"
+  ],
+  "author": "h-kono-it",
+  "license": "MIT",
+  "peerDependencies": {
+    "astro": ">=4.0.0"
+  }
+}
