@@ -1,6 +1,6 @@
 {
   "name": "astro-site-shell",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A CLI-style terminal widget for Astro sites",
   "type": "module",
   "exports": {
@@ -31,6 +31,6 @@
     "astro": ">=4.0.0"
   },
   "dependencies": {
-    "site-shell-core": "workspace:*"
+    "site-shell-core": "^0.1.0"
   }
 }
