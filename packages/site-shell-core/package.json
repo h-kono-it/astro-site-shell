@@ -1,0 +1,27 @@
+{
+  "name": "site-shell-core",
+  "version": "0.1.0",
+  "description": "Framework-agnostic core logic for the site-shell terminal widget",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles/terminal.css": "./styles/terminal.css"
+  },
+  "files": [
+    "src",
+    "styles"
+  ],
+  "keywords": [
+    "terminal",
+    "cli",
+    "shell",
+    "vanilla-js"
+  ],
+  "author": "h-kono-it",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/h-kono-it/astro-site-shell.git",
+    "directory": "packages/site-shell-core"
+  }
+}

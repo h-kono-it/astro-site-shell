@@ -1,0 +1,36 @@
+{
+  "name": "astro-site-shell",
+  "version": "0.2.0",
+  "description": "A CLI-style terminal widget for Astro sites",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "keywords": [
+    "astro",
+    "astro-component",
+    "terminal",
+    "cli",
+    "shell"
+  ],
+  "author": "h-kono-it",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/h-kono-it/astro-site-shell.git",
+    "directory": "packages/astro-site-shell"
+  },
+  "homepage": "https://github.com/h-kono-it/astro-site-shell",
+  "bugs": {
+    "url": "https://github.com/h-kono-it/astro-site-shell/issues"
+  },
+  "peerDependencies": {
+    "astro": ">=4.0.0"
+  },
+  "dependencies": {
+    "site-shell-core": "workspace:*"
+  }
+}

@@ -1,0 +1,144 @@
+---
+import type { FileEntry, Collection } from 'site-shell-core';
+import 'site-shell-core/styles/terminal.css';
+
+interface Props {
+  prompt?: string;
+  pages?: FileEntry[];
+  collections?: Collection[];
+}
+
+const { prompt = 'user@site', pages = [], collections = [] } = Astro.props;
+---
+
+<section class="terminal-section">
+  <h2>Terminal</h2>
+  <div
+    class="terminal"
+    id="terminal"
+    role="region"
+    aria-label="擬似CLIターミナル"
+    data-pages={JSON.stringify(pages)}
+    data-collections={JSON.stringify(collections)}
+    data-prompt={prompt}
+  >
+    <div
+      class="terminal-output"
+      id="terminal-output"
+      aria-live="polite"
+      aria-relevant="additions"
+    ></div>
+    <div class="terminal-input-row">
+      <span class="terminal-prompt" id="terminal-prompt" aria-hidden="true"></span>
+      <input
+        id="terminal-input"
+        type="text"
+        class="terminal-input"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-label="コマンド入力（Tabキーで補完、↑↓で履歴）"
+      />
+    </div>
+  </div>
+</section>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+  .terminal-section {
+    margin-top: 2rem;
+  }
+
+  .terminal-section h2 {
+    margin-bottom: 1rem;
+    font-size: 1.25rem;
+  }
+
+  .terminal {
+    background: #111;
+    color: #e0e0e0;
+    border-radius: 8px;
+    border: 1px solid #2a2a2a;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.65;
+    height: 300px;
+    display: flex;
+    flex-direction: column;
+    cursor: text;
+  }
+
+  @media (max-width: 480px) {
+    .terminal {
+      height: 240px;
+      font-size: 0.75rem;
+    }
+  }
+
+  .terminal-output {
+    flex: 1;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    scrollbar-width: thin;
+    scrollbar-color: #444 transparent;
+  }
+
+  .terminal-output::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .terminal-output::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 2px;
+  }
+
+  .terminal-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.375rem;
+    border-top: 1px solid #222;
+    margin-top: 0.25rem;
+    flex-shrink: 0;
+  }
+
+  .terminal-prompt {
+    color: #7dff7d;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .terminal-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #e0e0e0;
+    font: inherit;
+    caret-color: #e0e0e0;
+  }
+</style>
+
+<script>
+  import { attachTerminal } from 'site-shell-core';
+  import type { FileEntry, Collection } from 'site-shell-core';
+
+  const termEl = document.getElementById('terminal')!;
+  const pages: FileEntry[] = JSON.parse(termEl.dataset.pages ?? '[]');
+  const collections: Collection[] = JSON.parse(termEl.dataset.collections ?? '[]');
+  const promptLabel = termEl.dataset.prompt;
+
+  attachTerminal({
+    root:        termEl,
+    output:      document.getElementById('terminal-output')!,
+    input:       document.getElementById('terminal-input') as HTMLInputElement,
+    prompt:      document.getElementById('terminal-prompt')!,
+    pages,
+    collections,
+    promptLabel,
+  });
+</script>
