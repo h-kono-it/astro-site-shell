@@ -91,6 +91,10 @@ Tab completion works for commands, directories, and file names.
 
 - Astro v4 or later
 
+## Other frameworks
+
+The core logic is published separately as [`site-shell-core`](https://www.npmjs.com/package/site-shell-core). You can use it directly from Vue, React, Svelte, or vanilla JS via the `attachTerminal()` API.
+
 ## License
 
 MIT
