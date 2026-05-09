@@ -1,174 +1,43 @@
----
-interface FileEntry {
-  name: string;
-  url: string;
-  title: string;
-  pubDate?: Date;
-  body?: string;
-  tags?: string[];
-}
+import type { FileEntry, Collection } from './types.js';
+import { buildFs, resolvePath, esc, fmtDate } from './fs.js';
 
-interface Collection {
-  name: string;
-  entries: FileEntry[];
-}
-
-interface Props {
-  prompt?: string;
+export interface AttachOptions {
+  output: HTMLElement;
+  input: HTMLInputElement;
+  prompt: HTMLElement;
+  root: HTMLElement;
   pages?: FileEntry[];
   collections?: Collection[];
+  promptLabel?: string;
 }
 
-const { prompt = 'user@site', pages = [], collections = [] } = Astro.props;
-
-const fs: Record<string, { dirs: string[]; files: FileEntry[] }> = {
-  '/': {
-    dirs: collections.map(c => c.name),
-    files: pages,
-  },
-};
-for (const col of collections) {
-  fs[`/${col.name}`] = { dirs: [], files: col.entries };
+export interface TerminalHandle {
+  destroy(): void;
 }
----
 
-<section class="terminal-section">
-  <h2>Terminal</h2>
-  <div class="terminal" id="terminal" role="region" aria-label="擬似CLIターミナル">
-    <div
-      class="terminal-output"
-      id="terminal-output"
-      aria-live="polite"
-      aria-relevant="additions"
-    ></div>
-    <div class="terminal-input-row">
-      <span class="terminal-prompt" id="terminal-prompt" aria-hidden="true"></span>
-      <input
-        id="terminal-input"
-        type="text"
-        class="terminal-input"
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="off"
-        spellcheck="false"
-        aria-label="コマンド入力（Tabキーで補完、↑↓で履歴）"
-      />
-    </div>
-  </div>
-</section>
+const COMMANDS = ['cat', 'cd', 'clear', 'find', 'grep', 'help', 'ls', 'open', 'pwd', 'sl', 'view'];
 
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+export function attachTerminal(opts: AttachOptions): TerminalHandle {
+  const {
+    output: outputEl,
+    input: inputEl,
+    prompt: promptEl,
+    root: termEl,
+    pages = [],
+    collections = [],
+    promptLabel = 'user@site',
+  } = opts;
 
-  .terminal-section {
-    margin-top: 2rem;
-  }
-
-  .terminal-section h2 {
-    margin-bottom: 1rem;
-    font-size: 1.25rem;
-  }
-
-  .terminal {
-    background: #111;
-    color: #e0e0e0;
-    border-radius: 8px;
-    border: 1px solid #2a2a2a;
-    padding: 1rem;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.875rem;
-    line-height: 1.65;
-    height: 300px;
-    display: flex;
-    flex-direction: column;
-    cursor: text;
-  }
-
-  @media (max-width: 480px) {
-    .terminal {
-      height: 240px;
-      font-size: 0.75rem;
-    }
-  }
-
-  .terminal-output {
-    flex: 1;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-    scrollbar-width: thin;
-    scrollbar-color: #444 transparent;
-  }
-
-  .terminal-output::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .terminal-output::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: 2px;
-  }
-
-  .terminal-input-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-top: 0.375rem;
-    border-top: 1px solid #222;
-    margin-top: 0.25rem;
-    flex-shrink: 0;
-  }
-
-  .terminal-prompt {
-    color: #7dff7d;
-    white-space: nowrap;
-    user-select: none;
-  }
-
-  .terminal-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    color: #e0e0e0;
-    font: inherit;
-    caret-color: #e0e0e0;
-  }
-</style>
-
-<script is:inline define:vars={{ fs, prompt }}>
-  const styleEl = document.createElement('style');
-  styleEl.textContent = `
-    .ol-dir   { color: #6eb3ff; }
-    .ol-file  { color: #c8d0e0; }
-    .ol-err   { color: #ff6b6b; }
-    .ol-muted { color: #888888; }
-  `;
-  document.head.appendChild(styleEl);
-
-  const outputEl = document.getElementById('terminal-output');
-  const inputEl  = document.getElementById('terminal-input');
-  const promptEl = document.getElementById('terminal-prompt');
-  const termEl   = document.getElementById('terminal');
-
-  const COMMANDS = ['cat', 'cd', 'clear', 'find', 'grep', 'help', 'ls', 'open', 'pwd', 'sl', 'view'];
-
+  const fs = buildFs(pages, collections);
   let cwd = '/';
-  const cmdHistory = [];
+  const cmdHistory: string[] = [];
   let historyIdx = -1;
 
   function promptText() {
-    return `${prompt}:${cwd === '/' ? '~' : '~' + cwd}$`;
+    return `${promptLabel}:${cwd === '/' ? '~' : '~' + cwd}$`;
   }
 
-  function esc(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
-
-  function appendLine(text, cls) {
+  function appendLine(text: string, cls?: string) {
     const el = document.createElement('div');
     if (cls) el.className = cls;
     el.textContent = text;
@@ -176,7 +45,7 @@ for (const col of collections) {
     outputEl.scrollTop = outputEl.scrollHeight;
   }
 
-  function appendHtml(html, cls) {
+  function appendHtml(html: string, cls?: string) {
     const el = document.createElement('div');
     if (cls) el.className = cls;
     el.innerHTML = html;
@@ -184,26 +53,19 @@ for (const col of collections) {
     outputEl.scrollTop = outputEl.scrollHeight;
   }
 
-  function echoInput(val) {
+  function echoInput(val: string) {
     appendHtml(`<span style="color:#7dff7d">${esc(promptText())}</span> ${esc(val)}`);
   }
 
-  function resolvePath(base, rel) {
-    if (!rel || rel === '~') return '/';
-    if (rel.startsWith('/')) return rel.replace(/\/$/, '') || '/';
-    const segs = base === '/' ? [] : base.split('/').filter(Boolean);
-    for (const part of rel.replace(/\/$/, '').split('/')) {
-      if (part === '' || part === '.') continue;
-      if (part === '..') segs.pop();
-      else segs.push(part);
-    }
-    return segs.length ? '/' + segs.join('/') : '/';
+  function resolveArg(arg: string) {
+    const slash = arg.lastIndexOf('/');
+    if (slash === -1) return { dir: cwd, file: arg };
+    const dir = resolvePath(cwd, arg.slice(0, slash) || '/');
+    return { dir, file: arg.slice(slash + 1) };
   }
 
-  // ---- commands ----
-
   function cmdHelp() {
-    const rows = [
+    const rows: [string, string][] = [
       ['help',              'コマンド一覧を表示'],
       ['ls',                '現在の階層の一覧を表示'],
       ['ls -l',             '種別・公開日付きで表示'],
@@ -220,13 +82,7 @@ for (const col of collections) {
     });
   }
 
-  function fmtDate(d) {
-    if (!d) return null;
-    const date = d instanceof Date ? d : new Date(d);
-    return date.toISOString().slice(0, 10);
-  }
-
-  function cmdLs(args) {
+  function cmdLs(args: string[]) {
     const long = args.some(a => /^-l/.test(a));
     const dirArg = args.find(a => !a.startsWith('-'));
     const dir = dirArg ? resolvePath(cwd, dirArg) : cwd;
@@ -250,8 +106,8 @@ for (const col of collections) {
     if (!target.dirs.length && !target.files.length) appendLine('  (empty)', 'ol-muted');
   }
 
-  function cmdCd(target) {
-    const next = resolvePath(cwd, target);
+  function cmdCd(target: string | undefined) {
+    const next = resolvePath(cwd, target ?? '~');
     if (!fs[next]) {
       appendLine(`cd: no such directory: ${target}`, 'ol-err');
       return;
@@ -260,14 +116,7 @@ for (const col of collections) {
     promptEl.textContent = promptText();
   }
 
-  function resolveArg(arg) {
-    const slash = arg.lastIndexOf('/');
-    if (slash === -1) return { dir: cwd, file: arg };
-    const dir = resolvePath(cwd, arg.slice(0, slash) || '/');
-    return { dir, file: arg.slice(slash + 1) };
-  }
-
-  function cmdOpen(name) {
+  function cmdOpen(name: string | undefined) {
     if (!name) { appendLine('open: missing argument', 'ol-err'); return; }
     const { dir, file } = resolveArg(name);
     const target = fs[dir];
@@ -281,7 +130,7 @@ for (const col of collections) {
     }
   }
 
-  function cmdCat(name) {
+  function cmdCat(name: string | undefined) {
     if (!name) { appendLine('cat: missing argument', 'ol-err'); return; }
     const { dir, file } = resolveArg(name);
     const target = fs[dir];
@@ -296,7 +145,7 @@ for (const col of collections) {
     found.body.split('\n').forEach(line => appendLine(line));
   }
 
-  function cmdGrep(args) {
+  function cmdGrep(args: string[]) {
     const kw = args.join(' ').toLowerCase();
     if (!kw) { appendLine('grep: missing keyword', 'ol-err'); return; }
     let found = 0;
@@ -313,7 +162,7 @@ for (const col of collections) {
     if (!found) appendLine(`  (no matches for "${args.join(' ')}")`, 'ol-muted');
   }
 
-  function cmdFind(args) {
+  function cmdFind(args: string[]) {
     const ni = args.indexOf('-name');
     if (ni === -1 || !args[ni + 1]) {
       appendLine('find: usage: find -name <pattern>', 'ol-err');
@@ -371,7 +220,7 @@ for (const col of collections) {
     pre.addEventListener('animationend', () => wrapper.remove(), { once: true });
   }
 
-  function execute(raw) {
+  function execute(raw: string) {
     const input = raw.trim();
     if (!input) return;
     cmdHistory.unshift(input);
@@ -396,9 +245,7 @@ for (const col of collections) {
     }
   }
 
-  // ---- tab completion ----
-
-  function tabComplete(val) {
+  function tabComplete(val: string): string {
     const parts = val.trimStart().split(/\s+/);
     const cmd = parts[0];
     const arg = parts[1] ?? '';
@@ -443,13 +290,11 @@ for (const col of collections) {
     return val;
   }
 
-  // ---- init ----
-
-  appendLine('Welcome to the terminal. Type \'help\' for available commands.', 'ol-muted');
+  appendLine("Welcome to the terminal. Type 'help' for available commands.", 'ol-muted');
   appendLine('', '');
   promptEl.textContent = promptText();
 
-  inputEl.addEventListener('keydown', e => {
+  const onKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       const val = inputEl.value;
       inputEl.value = '';
@@ -473,7 +318,17 @@ for (const col of collections) {
         inputEl.value = '';
       }
     }
-  });
+  };
 
-  termEl.addEventListener('click', () => inputEl.focus());
-</script>
+  const onClick = () => inputEl.focus();
+
+  inputEl.addEventListener('keydown', onKeydown);
+  termEl.addEventListener('click', onClick);
+
+  return {
+    destroy() {
+      inputEl.removeEventListener('keydown', onKeydown);
+      termEl.removeEventListener('click', onClick);
+    },
+  };
+}

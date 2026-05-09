@@ -1,0 +1,9 @@
+.ol-dir   { color: #6eb3ff; }
+.ol-file  { color: #c8d0e0; }
+.ol-err   { color: #ff6b6b; }
+.ol-muted { color: #888888; }
+
+@keyframes sl-train {
+  from { left: 100%; }
+  to   { left: -500%; }
+}
