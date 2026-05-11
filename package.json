@@ -1,5 +1,8 @@
 {
   "name": "astro-site-shell-workspace",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp"]
+  }
 }
