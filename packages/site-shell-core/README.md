@@ -54,6 +54,7 @@ handle.destroy();
 | `promptLabel` | `string` | — | Prompt string (default: `'user@site'`) |
 | `pages` | `FileEntry[]` | — | Top-level pages |
 | `collections` | `Collection[]` | — | Collections, each mapped to a subdirectory |
+| `disabledCommands` | `string[]` | — | Commands to disable (e.g. `['sl', 'open']`) |
 
 ### `TerminalHandle`
 

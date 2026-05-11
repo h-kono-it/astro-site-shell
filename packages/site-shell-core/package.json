@@ -1,6 +1,6 @@
 {
   "name": "site-shell-core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Framework-agnostic core logic for the site-shell terminal widget",
   "type": "module",
   "exports": {

@@ -9,13 +9,18 @@ export interface AttachOptions {
   pages?: FileEntry[];
   collections?: Collection[];
   promptLabel?: string;
+  disabledCommands?: string[];
 }
 
 export interface TerminalHandle {
   destroy(): void;
 }
 
-const COMMANDS = ['cat', 'cd', 'clear', 'find', 'grep', 'help', 'ls', 'open', 'pwd', 'sl', 'view'];
+interface CommandDef {
+  names: string[];
+  run: (args: string[]) => void;
+  helpRows?: [string, string][];
+}
 
 export function attachTerminal(opts: AttachOptions): TerminalHandle {
   const {
@@ -26,12 +31,14 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
     pages = [],
     collections = [],
     promptLabel = 'user@site',
+    disabledCommands = [],
   } = opts;
 
   const fs = buildFs(pages, collections);
   let cwd = '/';
   const cmdHistory: string[] = [];
   let historyIdx = -1;
+  const disabled = new Set(disabledCommands);
 
   function promptText() {
     return `${promptLabel}:${cwd === '/' ? '~' : '~' + cwd}$`;
@@ -64,22 +71,17 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
     return { dir, file: arg.slice(slash + 1) };
   }
 
+  // declared early so cmdHelp can reference it via closure
+  let commandDefs: CommandDef[];
+
   function cmdHelp() {
-    const rows: [string, string][] = [
-      ['help',              'コマンド一覧を表示'],
-      ['ls',                '現在の階層の一覧を表示'],
-      ['ls -l',             '種別・公開日付きで表示'],
-      ['cd <dir>',          'ディレクトリを移動'],
-      ['cd ..',             '親ディレクトリに移動'],
-      ['cat/view <name>',   '記事の内容を表示'],
-      ['open <name>',       'ページ・記事を新しいタブで開く'],
-      ['grep <keyword>',    'タイトル・本文をキーワード検索'],
-      ['find -name <glob>', 'パターンで記事を検索（例: *java*）'],
-      ['clear',             '画面をクリア'],
-    ];
-    rows.forEach(([c, d]) => {
-      appendHtml(`  <span class="ol-file">${esc(c)}</span> <span class="ol-muted">— ${esc(d)}</span>`);
-    });
+    commandDefs
+      .filter(d => d.helpRows && !d.names.some(n => disabled.has(n)))
+      .forEach(({ helpRows }) => {
+        helpRows!.forEach(([c, d]) => {
+          appendHtml(`  <span class="ol-file">${esc(c)}</span> <span class="ol-muted">— ${esc(d)}</span>`);
+        });
+      });
   }
 
   function cmdLs(args: string[]) {
@@ -220,6 +222,68 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
     pre.addEventListener('animationend', () => wrapper.remove(), { once: true });
   }
 
+  commandDefs = [
+    {
+      names: ['help'],
+      run: () => cmdHelp(),
+      helpRows: [['help', 'コマンド一覧を表示']],
+    },
+    {
+      names: ['ls'],
+      run: (a) => cmdLs(a),
+      helpRows: [
+        ['ls',    '現在の階層の一覧を表示'],
+        ['ls -l', '種別・公開日付きで表示'],
+      ],
+    },
+    {
+      names: ['cd'],
+      run: (a) => cmdCd(a[0]),
+      helpRows: [
+        ['cd <dir>', 'ディレクトリを移動'],
+        ['cd ..',    '親ディレクトリに移動'],
+      ],
+    },
+    {
+      names: ['cat', 'view'],
+      run: (a) => cmdCat(a[0]),
+      helpRows: [['cat/view <name>', '記事の内容を表示']],
+    },
+    {
+      names: ['open'],
+      run: (a) => cmdOpen(a[0]),
+      helpRows: [['open <name>', 'ページ・記事を新しいタブで開く']],
+    },
+    {
+      names: ['grep'],
+      run: (a) => cmdGrep(a),
+      helpRows: [['grep <keyword>', 'タイトル・本文をキーワード検索']],
+    },
+    {
+      names: ['find'],
+      run: (a) => cmdFind(a),
+      helpRows: [['find -name <glob>', 'パターンで記事を検索（例: *java*）']],
+    },
+    {
+      names: ['pwd'],
+      run: () => appendLine(cwd === '/' ? '/' : cwd),
+    },
+    {
+      names: ['sl'],
+      run: () => cmdSl(),
+    },
+    {
+      names: ['clear'],
+      run: () => { outputEl.innerHTML = ''; },
+      helpRows: [['clear', '画面をクリア']],
+    },
+  ];
+
+  const commandLookup = new Map<string, CommandDef>();
+  for (const def of commandDefs) {
+    for (const name of def.names) commandLookup.set(name, def);
+  }
+
   function execute(raw: string) {
     const input = raw.trim();
     if (!input) return;
@@ -228,21 +292,12 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
     echoInput(input);
 
     const [cmd, ...args] = input.split(/\s+/);
-    switch (cmd) {
-      case 'help':  cmdHelp(); break;
-      case 'cat':
-      case 'view':  cmdCat(args[0]); break;
-      case 'ls':    cmdLs(args); break;
-      case 'cd':    cmdCd(args[0]); break;
-      case 'open':  cmdOpen(args[0]); break;
-      case 'grep':  cmdGrep(args); break;
-      case 'find':  cmdFind(args); break;
-      case 'pwd':   appendLine(cwd === '/' ? '/' : cwd); break;
-      case 'sl':    cmdSl(); break;
-      case 'clear': outputEl.innerHTML = ''; break;
-      default:
-        appendLine(`${cmd}: command not found  (type 'help' for commands)`, 'ol-err');
+    const def = commandLookup.get(cmd);
+    if (!def || disabled.has(cmd)) {
+      appendLine(`${cmd}: command not found  (type 'help' for commands)`, 'ol-err');
+      return;
     }
+    def.run(args);
   }
 
   function tabComplete(val: string): string {
@@ -251,7 +306,8 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
     const arg = parts[1] ?? '';
 
     if (parts.length === 1) {
-      const ms = COMMANDS.filter(c => c.startsWith(cmd));
+      const allNames = [...commandLookup.keys()].filter(c => !disabled.has(c));
+      const ms = allNames.filter(c => c.startsWith(cmd));
       if (ms.length === 1) return ms[0] + ' ';
       if (ms.length > 1) { echoInput(val); appendLine('  ' + ms.join('  '), 'ol-muted'); }
       return val;

@@ -1,0 +1,70 @@
+---
+import { CliTerminal } from 'astro-site-shell';
+import type { FileEntry, Collection } from 'site-shell-core';
+
+const pages: FileEntry[] = [
+  { name: 'about',   url: '/about',   title: 'About' },
+  { name: 'contact', url: '/contact', title: 'Contact' },
+];
+
+const collections: Collection[] = [
+  {
+    name: 'blog',
+    entries: [
+      {
+        name: 'hello-world',
+        url: '/blog/hello-world',
+        title: 'Hello World',
+        pubDate: new Date('2024-01-01'),
+        tags: ['intro'],
+        body: 'はじめての投稿です。',
+      },
+      {
+        name: 'astro-tips',
+        url: '/blog/astro-tips',
+        title: 'Astro Tips',
+        pubDate: new Date('2024-03-15'),
+        tags: ['astro', 'tips'],
+        body: 'Astro の便利な使い方をまとめました。',
+      },
+    ],
+  },
+];
+---
+
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>astro-site-shell example</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        background: #0d1117;
+        color: #e0e0e0;
+      }
+      h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+      p  { font-size: 0.875rem; color: #888; margin: 0 0 1.5rem; }
+      section { margin-bottom: 3rem; }
+    </style>
+  </head>
+  <body>
+    <section>
+      <h1>Default</h1>
+      <p>全コマンド有効</p>
+      <CliTerminal pages={pages} collections={collections} />
+    </section>
+
+    <section>
+      <h1>disabledCommands: ['sl', 'open']</h1>
+      <p>sl と open を無効化</p>
+      <CliTerminal
+        pages={pages}
+        collections={collections}
+        disabledCommands={['sl', 'open']}
+      />
+    </section>
+  </body>
+</html>
