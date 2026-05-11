@@ -4,6 +4,10 @@ Framework-agnostic core logic for the [astro-site-shell](https://www.npmjs.com/p
 
 If you're using Astro, use `astro-site-shell` instead. This package is for integrating the terminal into other frameworks such as Vue, React, Svelte, or vanilla JS.
 
+## Demo
+
+**[Live Demo](https://h-kono-it.github.io/astro-site-shell/)**
+
 ## Install
 
 ```bash

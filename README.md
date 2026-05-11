@@ -2,6 +2,8 @@
 
 A CLI-style terminal widget for your site. Navigate content through a pseudo shell interface.
 
+**[Demo](https://h-kono-it.github.io/astro-site-shell/)**
+
 ## Packages
 
 | Package | Description |

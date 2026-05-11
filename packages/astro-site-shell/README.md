@@ -4,6 +4,8 @@ A CLI-style terminal widget for [Astro](https://astro.build/) sites. Navigate yo
 
 ## Demo
 
+**[Live Demo](https://h-kono-it.github.io/astro-site-shell/)**
+
 ![astro-site-shell demo](https://raw.githubusercontent.com/h-kono-it/astro-site-shell/main/demo.png)
 
 ## Install
