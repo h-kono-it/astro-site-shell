@@ -6,32 +6,31 @@ interface Props {
   prompt?: string;
   pages?: FileEntry[];
   collections?: Collection[];
+  disabledCommands?: string[];
 }
 
-const { prompt = 'user@site', pages = [], collections = [] } = Astro.props;
+const { prompt = 'user@site', pages = [], collections = [], disabledCommands = [] } = Astro.props;
 ---
 
 <section class="terminal-section">
   <h2>Terminal</h2>
   <div
     class="terminal"
-    id="terminal"
     role="region"
     aria-label="擬似CLIターミナル"
     data-pages={JSON.stringify(pages)}
     data-collections={JSON.stringify(collections)}
     data-prompt={prompt}
+    data-disabled-commands={JSON.stringify(disabledCommands)}
   >
     <div
       class="terminal-output"
-      id="terminal-output"
       aria-live="polite"
       aria-relevant="additions"
     ></div>
     <div class="terminal-input-row">
-      <span class="terminal-prompt" id="terminal-prompt" aria-hidden="true"></span>
+      <span class="terminal-prompt" aria-hidden="true"></span>
       <input
-        id="terminal-input"
         type="text"
         class="terminal-input"
         autocomplete="off"
@@ -127,18 +126,21 @@ const { prompt = 'user@site', pages = [], collections = [] } = Astro.props;
   import { attachTerminal } from 'site-shell-core';
   import type { FileEntry, Collection } from 'site-shell-core';
 
-  const termEl = document.getElementById('terminal')!;
-  const pages: FileEntry[] = JSON.parse(termEl.dataset.pages ?? '[]');
-  const collections: Collection[] = JSON.parse(termEl.dataset.collections ?? '[]');
-  const promptLabel = termEl.dataset.prompt;
+  document.querySelectorAll<HTMLElement>('.terminal[data-pages]').forEach(termEl => {
+    const pages: FileEntry[] = JSON.parse(termEl.dataset.pages ?? '[]');
+    const collections: Collection[] = JSON.parse(termEl.dataset.collections ?? '[]');
+    const promptLabel = termEl.dataset.prompt;
+    const disabledCommands: string[] = JSON.parse(termEl.dataset.disabledCommands ?? '[]');
 
-  attachTerminal({
-    root:        termEl,
-    output:      document.getElementById('terminal-output')!,
-    input:       document.getElementById('terminal-input') as HTMLInputElement,
-    prompt:      document.getElementById('terminal-prompt')!,
-    pages,
-    collections,
-    promptLabel,
+    attachTerminal({
+      root:             termEl,
+      output:           termEl.querySelector('.terminal-output')!,
+      input:            termEl.querySelector<HTMLInputElement>('.terminal-input')!,
+      prompt:           termEl.querySelector('.terminal-prompt')!,
+      pages,
+      collections,
+      promptLabel,
+      disabledCommands,
+    });
   });
 </script>

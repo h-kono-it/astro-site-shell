@@ -4,7 +4,7 @@ A CLI-style terminal widget for [Astro](https://astro.build/) sites. Navigate yo
 
 ## Demo
 
-![astro-site-shell demo](https://raw.githubusercontent.com/h-kono-it/astro-site-shell/main/examples/demo.png)
+![astro-site-shell demo](https://raw.githubusercontent.com/h-kono-it/astro-site-shell/main/demo.png)
 
 ## Install
 
@@ -51,6 +51,7 @@ const posts = await getCollection('posts');
 | `prompt` | `string` | `'user@site'` | Prompt label shown before `~$` |
 | `pages` | `FileEntry[]` | `[]` | Top-level pages (no date, no body required) |
 | `collections` | `Collection[]` | `[]` | Content collections, each mapped to a subdirectory |
+| `disabledCommands` | `string[]` | `[]` | Commands to disable (e.g. `['sl', 'open']`) |
 
 ### `FileEntry`
 
