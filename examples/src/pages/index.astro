@@ -48,9 +48,26 @@ const collections: Collection[] = [
       h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
       p  { font-size: 0.875rem; color: #888; margin: 0 0 1.5rem; }
       section { margin-bottom: 3rem; }
+      .links {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        font-size: 0.875rem;
+      }
+      .links a {
+        color: #58a6ff;
+        text-decoration: none;
+      }
+      .links a:hover {
+        text-decoration: underline;
+      }
     </style>
   </head>
   <body>
+    <div class="links">
+      <a href="https://www.npmjs.com/package/astro-site-shell" target="_blank" rel="noopener">npm</a>
+      <a href="https://github.com/h-kono-it/astro-site-shell" target="_blank" rel="noopener">GitHub</a>
+    </div>
     <section>
       <h1>Default</h1>
       <p>全コマンド有効</p>
