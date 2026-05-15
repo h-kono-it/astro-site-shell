@@ -18,7 +18,7 @@ export interface TerminalHandle {
 
 interface CommandDef {
   names: string[];
-  run: (args: string[]) => void;
+  run: (args: string[], cmd: string) => void;
   helpRows?: [string, string][];
 }
 
@@ -132,13 +132,20 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
     }
   }
 
-  function cmdCat(name: string | undefined) {
-    if (!name) { appendLine('cat: missing argument', 'ol-err'); return; }
+  function cmdCat(name: string | undefined, cmd: string) {
+    if (!name) { appendLine(`${cmd}: missing argument`, 'ol-err'); return; }
     const { dir, file } = resolveArg(name);
     const target = fs[dir];
-    if (!target) { appendLine(`cat: ${name}: no such file or directory`, 'ol-err'); return; }
+    if (!target) { appendLine(`${cmd}: ${name}: no such file or directory`, 'ol-err'); return; }
     const found = target.files.find(f => f.name === file);
-    if (!found) { appendLine(`cat: ${name}: no such file`, 'ol-err'); return; }
+    if (!found) {
+      if (fs[resolvePath(cwd, name)]) {
+        appendLine(`${cmd}: ${name}: is a directory  (use 'ls' to list contents)`, 'ol-err');
+      } else {
+        appendLine(`${cmd}: ${name}: no such file`, 'ol-err');
+      }
+      return;
+    }
     if (!found.body) {
       appendLine(`  (no content — try 'open ${name}')`, 'ol-muted');
       return;
@@ -246,7 +253,7 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
     },
     {
       names: ['cat', 'view'],
-      run: (a) => cmdCat(a[0]),
+      run: (a, cmd) => cmdCat(a[0], cmd),
       helpRows: [['cat/view <name>', '記事の内容を表示']],
     },
     {
@@ -297,7 +304,7 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
       appendLine(`${cmd}: command not found  (type 'help' for commands)`, 'ol-err');
       return;
     }
-    def.run(args);
+    def.run(args, cmd);
   }
 
   function tabComplete(val: string): string {
@@ -376,7 +383,10 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
     }
   };
 
-  const onClick = () => inputEl.focus();
+  const onClick = () => {
+    if (window.getSelection()?.toString()) return;
+    inputEl.focus();
+  };
 
   inputEl.addEventListener('keydown', onKeydown);
   termEl.addEventListener('click', onClick);
