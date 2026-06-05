@@ -16,20 +16,16 @@ npm install site-shell-core
 
 ## Usage
 
-### `attachTerminal(opts)`
+### `new Terminal(root, opts?)`
 
-Pass references to DOM elements and the terminal is ready to go.
+Pass the root element and options — the terminal queries `.terminal-output`, `.terminal-input`, and `.terminal-prompt` internally.
 
 ```ts
-import { attachTerminal } from 'site-shell-core';
+import { Terminal } from 'site-shell-core';
 import 'site-shell-core/styles/terminal.css';
 
-const handle = attachTerminal({
-  root:         document.getElementById('terminal'),
-  output:       document.getElementById('terminal-output'),
-  input:        document.getElementById('terminal-input'),
-  prompt:       document.getElementById('terminal-prompt'),
-  promptLabel:  'you@mysite',
+const terminal = new Terminal(document.getElementById('terminal'), {
+  promptLabel: 'you@mysite',
   pages: [
     { name: 'about', url: '/about', title: 'About' },
   ],
@@ -44,29 +40,37 @@ const handle = attachTerminal({
 });
 
 // Clean up
-handle.destroy();
+terminal.destroy();
 ```
 
-### Options (`AttachOptions`)
+### Options (`TerminalOptions`)
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `root` | `HTMLElement` | ✓ | Root element of the terminal (click to focus) |
-| `output` | `HTMLElement` | ✓ | Element where output lines are appended |
-| `input` | `HTMLInputElement` | ✓ | Command input field |
-| `prompt` | `HTMLElement` | ✓ | Element displaying the prompt label |
 | `promptLabel` | `string` | — | Prompt string (default: `'user@site'`) |
 | `pages` | `FileEntry[]` | — | Top-level pages |
 | `collections` | `Collection[]` | — | Collections, each mapped to a subdirectory |
 | `disabledCommands` | `string[]` | — | Commands to disable (e.g. `['sl', 'open']`) |
 
-### `TerminalHandle`
-
-Return value of `attachTerminal`.
+### `Terminal` instance
 
 | Method | Description |
 |---|---|
 | `destroy()` | Remove all event listeners |
+
+## HTML structure
+
+The root element must contain these three child elements:
+
+```html
+<div id="terminal">
+  <div class="terminal-output"></div>
+  <div class="terminal-input-row">
+    <span class="terminal-prompt"></span>
+    <input type="text" class="terminal-input" />
+  </div>
+</div>
+```
 
 ## Framework examples
 
@@ -74,40 +78,29 @@ Return value of `attachTerminal`.
 
 ```vue
 <template>
-  <div ref="termRef" class="terminal" @click="inputRef?.focus()">
-    <div ref="outputRef" class="terminal-output"></div>
+  <div ref="termRef" class="terminal">
+    <div class="terminal-output"></div>
     <div class="terminal-input-row">
-      <span ref="promptRef" class="terminal-prompt"></span>
-      <input ref="inputRef" type="text" class="terminal-input" />
+      <span class="terminal-prompt"></span>
+      <input type="text" class="terminal-input" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { attachTerminal, type TerminalHandle } from 'site-shell-core';
+import { Terminal } from 'site-shell-core';
 import 'site-shell-core/styles/terminal.css';
 
 const props = defineProps<{ promptLabel?: string }>();
-
-const termRef   = ref<HTMLElement>();
-const outputRef = ref<HTMLElement>();
-const inputRef  = ref<HTMLInputElement>();
-const promptRef = ref<HTMLElement>();
-
-let handle: TerminalHandle;
+const termRef = ref<HTMLElement>();
+let terminal: Terminal;
 
 onMounted(() => {
-  handle = attachTerminal({
-    root:        termRef.value!,
-    output:      outputRef.value!,
-    input:       inputRef.value!,
-    prompt:      promptRef.value!,
-    promptLabel: props.promptLabel,
-  });
+  terminal = new Terminal(termRef.value!, { promptLabel: props.promptLabel });
 });
 
-onUnmounted(() => handle?.destroy());
+onUnmounted(() => terminal?.destroy());
 </script>
 ```
 
@@ -115,32 +108,23 @@ onUnmounted(() => handle?.destroy());
 
 ```tsx
 import { useEffect, useRef } from 'react';
-import { attachTerminal, type TerminalHandle } from 'site-shell-core';
+import { Terminal } from 'site-shell-core';
 import 'site-shell-core/styles/terminal.css';
 
-export function Terminal({ promptLabel }: { promptLabel?: string }) {
-  const termRef   = useRef<HTMLDivElement>(null);
-  const outputRef = useRef<HTMLDivElement>(null);
-  const inputRef  = useRef<HTMLInputElement>(null);
-  const promptRef = useRef<HTMLSpanElement>(null);
+export function TerminalWidget({ promptLabel }: { promptLabel?: string }) {
+  const termRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handle: TerminalHandle = attachTerminal({
-      root:        termRef.current!,
-      output:      outputRef.current!,
-      input:       inputRef.current!,
-      prompt:      promptRef.current!,
-      promptLabel,
-    });
-    return () => handle.destroy();
+    const terminal = new Terminal(termRef.current!, { promptLabel });
+    return () => terminal.destroy();
   }, []);
 
   return (
-    <div ref={termRef} className="terminal" onClick={() => inputRef.current?.focus()}>
-      <div ref={outputRef} className="terminal-output"></div>
+    <div ref={termRef} className="terminal">
+      <div className="terminal-output"></div>
       <div className="terminal-input-row">
-        <span ref={promptRef} className="terminal-prompt"></span>
-        <input ref={inputRef} type="text" className="terminal-input" />
+        <span className="terminal-prompt"></span>
+        <input type="text" className="terminal-input" />
       </div>
     </div>
   );

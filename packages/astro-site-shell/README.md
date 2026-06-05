@@ -96,7 +96,7 @@ Tab completion works for commands, directories, and file names.
 
 ## Other frameworks
 
-The core logic is published separately as [`site-shell-core`](https://www.npmjs.com/package/site-shell-core). You can use it directly from Vue, React, Svelte, or vanilla JS via the `attachTerminal()` API.
+The core logic is published separately as [`site-shell-core`](https://www.npmjs.com/package/site-shell-core). You can use it directly from Vue, React, Svelte, or vanilla JS via the `Terminal` class.
 
 ## License
 
