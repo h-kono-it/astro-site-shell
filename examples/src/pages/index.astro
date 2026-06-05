@@ -1,6 +1,7 @@
 ---
 import { CliTerminal } from 'astro-site-shell';
 import type { FileEntry, Collection } from 'site-shell-core';
+import 'site-shell-core/styles/terminal.css';
 
 const pages: FileEntry[] = [
   { name: 'about',   url: '/about',   title: 'About' },
@@ -83,5 +84,108 @@ const collections: Collection[] = [
         disabledCommands={['sl', 'open']}
       />
     </section>
+
+    <section>
+      <h1>new Terminal() — クラス直接使用</h1>
+      <p>site-shell-core の Terminal クラスをフレームワーク非依存で使用する例</p>
+      <div
+        id="raw-terminal"
+        role="region"
+        aria-label="擬似CLIターミナル"
+      >
+        <div class="terminal-output" aria-live="polite" aria-relevant="additions"></div>
+        <div class="terminal-input-row">
+          <span class="terminal-prompt" aria-hidden="true"></span>
+          <input
+            type="text"
+            class="terminal-input"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            aria-label="コマンド入力（Tabキーで補完、↑↓で履歴）"
+          />
+        </div>
+      </div>
+    </section>
   </body>
 </html>
+
+<style is:global>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+  #raw-terminal {
+    background: #111;
+    color: #e0e0e0;
+    border-radius: 8px;
+    border: 1px solid #2a2a2a;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.65;
+    height: 300px;
+    display: flex;
+    flex-direction: column;
+    cursor: text;
+  }
+
+  #raw-terminal .terminal-output {
+    flex: 1;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    scrollbar-width: thin;
+    scrollbar-color: #444 transparent;
+  }
+
+  #raw-terminal .terminal-output::-webkit-scrollbar { width: 4px; }
+  #raw-terminal .terminal-output::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+  #raw-terminal .terminal-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.375rem;
+    border-top: 1px solid #222;
+    margin-top: 0.25rem;
+    flex-shrink: 0;
+  }
+
+  #raw-terminal .terminal-prompt {
+    color: #7dff7d;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  #raw-terminal .terminal-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #e0e0e0;
+    font: inherit;
+    caret-color: #e0e0e0;
+  }
+</style>
+
+<script>
+  import { Terminal } from 'site-shell-core';
+  import type { FileEntry, Collection } from 'site-shell-core';
+
+  const pages: FileEntry[] = [
+    { name: 'about',   url: '/about',   title: 'About' },
+    { name: 'contact', url: '/contact', title: 'Contact' },
+  ];
+  const collections: Collection[] = [
+    {
+      name: 'blog',
+      entries: [
+        { name: 'hello-world', url: '/blog/hello-world', title: 'Hello World', pubDate: new Date('2024-01-01'), tags: ['intro'], body: 'はじめての投稿です。' },
+        { name: 'astro-tips',  url: '/blog/astro-tips',  title: 'Astro Tips',  pubDate: new Date('2024-03-15'), tags: ['astro', 'tips'], body: 'Astro の便利な使い方をまとめました。' },
+      ],
+    },
+  ];
+
+  const el = document.getElementById('raw-terminal') as HTMLElement;
+  (el as any)._terminal = new Terminal(el, { pages, collections, promptLabel: 'raw@terminal' });
+</script>

@@ -1,19 +1,11 @@
 import type { FileEntry, Collection } from './types.js';
 import { buildFs, resolvePath, esc, fmtDate } from './fs.js';
 
-export interface AttachOptions {
-  output: HTMLElement;
-  input: HTMLInputElement;
-  prompt: HTMLElement;
-  root: HTMLElement;
+export interface TerminalOptions {
   pages?: FileEntry[];
   collections?: Collection[];
   promptLabel?: string;
   disabledCommands?: string[];
-}
-
-export interface TerminalHandle {
-  destroy(): void;
 }
 
 interface CommandDef {
@@ -22,180 +14,209 @@ interface CommandDef {
   helpRows?: [string, string][];
 }
 
-export function attachTerminal(opts: AttachOptions): TerminalHandle {
-  const {
-    output: outputEl,
-    input: inputEl,
-    prompt: promptEl,
-    root: termEl,
-    pages = [],
-    collections = [],
-    promptLabel = 'user@site',
-    disabledCommands = [],
-  } = opts;
+export class Terminal {
+  private outputEl: HTMLElement;
+  private inputEl: HTMLInputElement;
+  private promptEl: HTMLElement;
+  private termEl: HTMLElement;
 
-  const fs = buildFs(pages, collections);
-  let cwd = '/';
-  const cmdHistory: string[] = [];
-  let historyIdx = -1;
-  const disabled = new Set(disabledCommands);
+  private fs: ReturnType<typeof buildFs>;
+  private cwd = '/';
+  private cmdHistory: string[] = [];
+  private historyIdx = -1;
+  private disabled: Set<string>;
+  private promptLabel: string;
 
-  function promptText() {
-    return `${promptLabel}:${cwd === '/' ? '~' : '~' + cwd}$`;
+  private commandDefs: CommandDef[] = [];
+  private commandLookup = new Map<string, CommandDef>();
+
+  constructor(root: HTMLElement, opts: TerminalOptions = {}) {
+    const {
+      pages = [],
+      collections = [],
+      promptLabel = 'user@site',
+      disabledCommands = [],
+    } = opts;
+
+    this.termEl    = root;
+    this.outputEl  = root.querySelector('.terminal-output')!;
+    this.inputEl   = root.querySelector<HTMLInputElement>('.terminal-input')!;
+    this.promptEl  = root.querySelector('.terminal-prompt')!;
+    this.fs        = buildFs(pages, collections);
+    this.promptLabel = promptLabel;
+    this.disabled  = new Set(disabledCommands);
+
+    this.commandDefs = this.buildCommandDefs();
+    for (const def of this.commandDefs) {
+      for (const name of def.names) this.commandLookup.set(name, def);
+    }
+
+    this.appendLine("Welcome to the terminal. Type 'help' for available commands.", 'ol-muted');
+    this.appendLine('', '');
+    this.promptEl.textContent = this.promptText();
+
+    this.inputEl.addEventListener('keydown', this.onKeydown);
+    this.termEl.addEventListener('click', this.onClick);
   }
 
-  function appendLine(text: string, cls?: string) {
+  destroy(): void {
+    this.inputEl.removeEventListener('keydown', this.onKeydown);
+    this.termEl.removeEventListener('click', this.onClick);
+  }
+
+  private promptText() {
+    return `${this.promptLabel}:${this.cwd === '/' ? '~' : '~' + this.cwd}$`;
+  }
+
+  private appendLine(text: string, cls?: string) {
     const el = document.createElement('div');
     if (cls) el.className = cls;
     el.textContent = text;
-    outputEl.appendChild(el);
-    outputEl.scrollTop = outputEl.scrollHeight;
+    this.outputEl.appendChild(el);
+    this.outputEl.scrollTop = this.outputEl.scrollHeight;
   }
 
-  function appendHtml(html: string, cls?: string) {
+  private appendHtml(html: string, cls?: string) {
     const el = document.createElement('div');
     if (cls) el.className = cls;
     el.innerHTML = html;
-    outputEl.appendChild(el);
-    outputEl.scrollTop = outputEl.scrollHeight;
+    this.outputEl.appendChild(el);
+    this.outputEl.scrollTop = this.outputEl.scrollHeight;
   }
 
-  function echoInput(val: string) {
-    appendHtml(`<span style="color:#7dff7d">${esc(promptText())}</span> ${esc(val)}`);
+  private echoInput(val: string) {
+    this.appendHtml(`<span style="color:#7dff7d">${esc(this.promptText())}</span> ${esc(val)}`);
   }
 
-  function resolveArg(arg: string) {
+  private resolveArg(arg: string) {
     const slash = arg.lastIndexOf('/');
-    if (slash === -1) return { dir: cwd, file: arg };
-    const dir = resolvePath(cwd, arg.slice(0, slash) || '/');
+    if (slash === -1) return { dir: this.cwd, file: arg };
+    const dir = resolvePath(this.cwd, arg.slice(0, slash) || '/');
     return { dir, file: arg.slice(slash + 1) };
   }
 
-  // declared early so cmdHelp can reference it via closure
-  let commandDefs: CommandDef[];
-
-  function cmdHelp() {
-    commandDefs
-      .filter(d => d.helpRows && !d.names.some(n => disabled.has(n)))
+  private cmdHelp() {
+    this.commandDefs
+      .filter(d => d.helpRows && !d.names.some(n => this.disabled.has(n)))
       .forEach(({ helpRows }) => {
         helpRows!.forEach(([c, d]) => {
-          appendHtml(`  <span class="ol-file">${esc(c)}</span> <span class="ol-muted">— ${esc(d)}</span>`);
+          this.appendHtml(`  <span class="ol-file">${esc(c)}</span> <span class="ol-muted">— ${esc(d)}</span>`);
         });
       });
   }
 
-  function cmdLs(args: string[]) {
+  private cmdLs(args: string[]) {
     const long = args.some(a => /^-l/.test(a));
     const dirArg = args.find(a => !a.startsWith('-'));
-    const dir = dirArg ? resolvePath(cwd, dirArg) : cwd;
-    const target = fs[dir];
-    if (!target) { appendLine(`ls: ${dirArg}: no such directory`, 'ol-err'); return; }
+    const dir = dirArg ? resolvePath(this.cwd, dirArg) : this.cwd;
+    const target = this.fs[dir];
+    if (!target) { this.appendLine(`ls: ${dirArg}: no such directory`, 'ol-err'); return; }
 
     if (long) {
       target.dirs.forEach(d => {
-        appendHtml(`  <span class="ol-muted">d</span>  <span class="ol-muted">          </span>  <span class="ol-dir">${esc(d)}/</span>`);
+        this.appendHtml(`  <span class="ol-muted">d</span>  <span class="ol-muted">          </span>  <span class="ol-dir">${esc(d)}/</span>`);
       });
       target.files.forEach(f => {
         const date = fmtDate(f.pubDate) ?? '          ';
-        appendHtml(`  <span class="ol-muted">f</span>  <span class="ol-muted">${date}</span>  <span class="ol-file">${esc(f.name)}</span> <span class="ol-muted">— ${esc(f.title)}</span>`);
+        this.appendHtml(`  <span class="ol-muted">f</span>  <span class="ol-muted">${date}</span>  <span class="ol-file">${esc(f.name)}</span> <span class="ol-muted">— ${esc(f.title)}</span>`);
       });
     } else {
-      target.dirs.forEach(d => appendLine(`  ${d}/`, 'ol-dir'));
+      target.dirs.forEach(d => this.appendLine(`  ${d}/`, 'ol-dir'));
       target.files.forEach(f => {
-        appendHtml(`  <span class="ol-file">${esc(f.name)}</span> <span class="ol-muted">— ${esc(f.title)}</span>`);
+        this.appendHtml(`  <span class="ol-file">${esc(f.name)}</span> <span class="ol-muted">— ${esc(f.title)}</span>`);
       });
     }
-    if (!target.dirs.length && !target.files.length) appendLine('  (empty)', 'ol-muted');
+    if (!target.dirs.length && !target.files.length) this.appendLine('  (empty)', 'ol-muted');
   }
 
-  function cmdCd(target: string | undefined) {
-    const next = resolvePath(cwd, target ?? '~');
-    if (!fs[next]) {
-      appendLine(`cd: no such directory: ${target}`, 'ol-err');
+  private cmdCd(target: string | undefined) {
+    const next = resolvePath(this.cwd, target ?? '~');
+    if (!this.fs[next]) {
+      this.appendLine(`cd: no such directory: ${target}`, 'ol-err');
       return;
     }
-    cwd = next;
-    promptEl.textContent = promptText();
+    this.cwd = next;
+    this.promptEl.textContent = this.promptText();
   }
 
-  function cmdOpen(name: string | undefined) {
-    if (!name) { appendLine('open: missing argument', 'ol-err'); return; }
-    const { dir, file } = resolveArg(name);
-    const target = fs[dir];
-    if (!target) { appendLine(`open: ${name}: no such directory`, 'ol-err'); return; }
+  private cmdOpen(name: string | undefined) {
+    if (!name) { this.appendLine('open: missing argument', 'ol-err'); return; }
+    const { dir, file } = this.resolveArg(name);
+    const target = this.fs[dir];
+    if (!target) { this.appendLine(`open: ${name}: no such directory`, 'ol-err'); return; }
     const found = target.files.find(f => f.name === file);
     if (found) {
-      appendLine(`  → ${found.url}`, 'ol-muted');
+      this.appendLine(`  → ${found.url}`, 'ol-muted');
       window.open(found.url, '_blank', 'noopener,noreferrer');
     } else {
-      appendLine(`open: ${name}: not found`, 'ol-err');
+      this.appendLine(`open: ${name}: not found`, 'ol-err');
     }
   }
 
-  function cmdCat(name: string | undefined, cmd: string) {
-    if (!name) { appendLine(`${cmd}: missing argument`, 'ol-err'); return; }
-    const { dir, file } = resolveArg(name);
-    const target = fs[dir];
-    if (!target) { appendLine(`${cmd}: ${name}: no such file or directory`, 'ol-err'); return; }
+  private cmdCat(name: string | undefined, cmd: string) {
+    if (!name) { this.appendLine(`${cmd}: missing argument`, 'ol-err'); return; }
+    const { dir, file } = this.resolveArg(name);
+    const target = this.fs[dir];
+    if (!target) { this.appendLine(`${cmd}: ${name}: no such file or directory`, 'ol-err'); return; }
     const found = target.files.find(f => f.name === file);
     if (!found) {
-      if (fs[resolvePath(cwd, name)]) {
-        appendLine(`${cmd}: ${name}: is a directory  (use 'ls' to list contents)`, 'ol-err');
+      if (this.fs[resolvePath(this.cwd, name)]) {
+        this.appendLine(`${cmd}: ${name}: is a directory  (use 'ls' to list contents)`, 'ol-err');
       } else {
-        appendLine(`${cmd}: ${name}: no such file`, 'ol-err');
+        this.appendLine(`${cmd}: ${name}: no such file`, 'ol-err');
       }
       return;
     }
     if (!found.body) {
-      appendLine(`  (no content — try 'open ${name}')`, 'ol-muted');
+      this.appendLine(`  (no content — try 'open ${name}')`, 'ol-muted');
       return;
     }
-    appendLine(`  ── ${found.title} ──`, 'ol-muted');
-    found.body.split('\n').forEach(line => appendLine(line));
+    this.appendLine(`  ── ${found.title} ──`, 'ol-muted');
+    found.body.split('\n').forEach(line => this.appendLine(line));
   }
 
-  function cmdGrep(args: string[]) {
+  private cmdGrep(args: string[]) {
     const kw = args.join(' ').toLowerCase();
-    if (!kw) { appendLine('grep: missing keyword', 'ol-err'); return; }
+    if (!kw) { this.appendLine('grep: missing keyword', 'ol-err'); return; }
     let found = 0;
-    Object.entries(fs).forEach(([path, n]) => {
+    Object.entries(this.fs).forEach(([path, n]) => {
       n.files.forEach(f => {
         const haystack = [f.title, f.name, ...(f.tags ?? []), f.body ?? ''].join('\n').toLowerCase();
         if (haystack.includes(kw)) {
           const p = path === '/' ? f.name : `${path.slice(1)}/${f.name}`;
-          appendHtml(`  <span class="ol-file">${esc(p)}</span> <span class="ol-muted">— ${esc(f.title)}</span>`);
+          this.appendHtml(`  <span class="ol-file">${esc(p)}</span> <span class="ol-muted">— ${esc(f.title)}</span>`);
           found++;
         }
       });
     });
-    if (!found) appendLine(`  (no matches for "${args.join(' ')}")`, 'ol-muted');
+    if (!found) this.appendLine(`  (no matches for "${args.join(' ')}")`, 'ol-muted');
   }
 
-  function cmdFind(args: string[]) {
+  private cmdFind(args: string[]) {
     const ni = args.indexOf('-name');
     if (ni === -1 || !args[ni + 1]) {
-      appendLine('find: usage: find -name <pattern>', 'ol-err');
+      this.appendLine('find: usage: find -name <pattern>', 'ol-err');
       return;
     }
     const pat = args[ni + 1].replace(/^['"]|['"]$/g, '');
     const reStr = pat.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
     const re = new RegExp(`^${reStr}$`, 'i');
     let found = 0;
-    const base = cwd;
-    Object.entries(fs).forEach(([path, n]) => {
+    const base = this.cwd;
+    Object.entries(this.fs).forEach(([path, n]) => {
       if (path !== base && !path.startsWith(base === '/' ? '/' : base + '/')) return;
       n.files.forEach(f => {
         if (re.test(f.name)) {
           const rel = '.' + (path === '/' ? '' : path) + '/' + f.name;
-          appendLine(`  ${rel}`, 'ol-file');
+          this.appendLine(`  ${rel}`, 'ol-file');
           found++;
         }
       });
     });
-    if (!found) appendLine(`  (no matches for "${pat}")`, 'ol-muted');
+    if (!found) this.appendLine(`  (no matches for "${pat}")`, 'ol-muted');
   }
 
-  function cmdSl() {
+  private cmdSl() {
     const art = [
       '      ====        ________                ___________',
       '  _D _|  |_______/        \\__I_I_____===__|_________|',
@@ -224,121 +245,118 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
       document.head.appendChild(s);
     }
 
-    outputEl.appendChild(wrapper);
-    outputEl.scrollTop = outputEl.scrollHeight;
+    this.outputEl.appendChild(wrapper);
+    this.outputEl.scrollTop = this.outputEl.scrollHeight;
     pre.addEventListener('animationend', () => wrapper.remove(), { once: true });
   }
 
-  commandDefs = [
-    {
-      names: ['help'],
-      run: () => cmdHelp(),
-      helpRows: [['help', 'コマンド一覧を表示']],
-    },
-    {
-      names: ['ls'],
-      run: (a) => cmdLs(a),
-      helpRows: [
-        ['ls',    '現在の階層の一覧を表示'],
-        ['ls -l', '種別・公開日付きで表示'],
-      ],
-    },
-    {
-      names: ['cd'],
-      run: (a) => cmdCd(a[0]),
-      helpRows: [
-        ['cd <dir>', 'ディレクトリを移動'],
-        ['cd ..',    '親ディレクトリに移動'],
-      ],
-    },
-    {
-      names: ['cat', 'view'],
-      run: (a, cmd) => cmdCat(a[0], cmd),
-      helpRows: [['cat/view <name>', '記事の内容を表示']],
-    },
-    {
-      names: ['open'],
-      run: (a) => cmdOpen(a[0]),
-      helpRows: [['open <name>', 'ページ・記事を新しいタブで開く']],
-    },
-    {
-      names: ['grep'],
-      run: (a) => cmdGrep(a),
-      helpRows: [['grep <keyword>', 'タイトル・本文をキーワード検索']],
-    },
-    {
-      names: ['find'],
-      run: (a) => cmdFind(a),
-      helpRows: [['find -name <glob>', 'パターンで記事を検索（例: *java*）']],
-    },
-    {
-      names: ['pwd'],
-      run: () => appendLine(cwd === '/' ? '/' : cwd),
-    },
-    {
-      names: ['sl'],
-      run: () => cmdSl(),
-    },
-    {
-      names: ['clear'],
-      run: () => { outputEl.innerHTML = ''; },
-      helpRows: [['clear', '画面をクリア']],
-    },
-  ];
-
-  const commandLookup = new Map<string, CommandDef>();
-  for (const def of commandDefs) {
-    for (const name of def.names) commandLookup.set(name, def);
+  private buildCommandDefs(): CommandDef[] {
+    return [
+      {
+        names: ['help'],
+        run: () => this.cmdHelp(),
+        helpRows: [['help', 'コマンド一覧を表示']],
+      },
+      {
+        names: ['ls'],
+        run: (a) => this.cmdLs(a),
+        helpRows: [
+          ['ls',    '現在の階層の一覧を表示'],
+          ['ls -l', '種別・公開日付きで表示'],
+        ],
+      },
+      {
+        names: ['cd'],
+        run: (a) => this.cmdCd(a[0]),
+        helpRows: [
+          ['cd <dir>', 'ディレクトリを移動'],
+          ['cd ..',    '親ディレクトリに移動'],
+        ],
+      },
+      {
+        names: ['cat', 'view'],
+        run: (a, cmd) => this.cmdCat(a[0], cmd),
+        helpRows: [['cat/view <name>', '記事の内容を表示']],
+      },
+      {
+        names: ['open'],
+        run: (a) => this.cmdOpen(a[0]),
+        helpRows: [['open <name>', 'ページ・記事を新しいタブで開く']],
+      },
+      {
+        names: ['grep'],
+        run: (a) => this.cmdGrep(a),
+        helpRows: [['grep <keyword>', 'タイトル・本文をキーワード検索']],
+      },
+      {
+        names: ['find'],
+        run: (a) => this.cmdFind(a),
+        helpRows: [['find -name <glob>', 'パターンで記事を検索（例: *java*）']],
+      },
+      {
+        names: ['pwd'],
+        run: () => this.appendLine(this.cwd === '/' ? '/' : this.cwd),
+      },
+      {
+        names: ['sl'],
+        run: () => this.cmdSl(),
+      },
+      {
+        names: ['clear'],
+        run: () => { this.outputEl.innerHTML = ''; },
+        helpRows: [['clear', '画面をクリア']],
+      },
+    ];
   }
 
-  function execute(raw: string) {
+  private execute(raw: string) {
     const input = raw.trim();
     if (!input) return;
-    cmdHistory.unshift(input);
-    historyIdx = -1;
-    echoInput(input);
+    this.cmdHistory.unshift(input);
+    this.historyIdx = -1;
+    this.echoInput(input);
 
     const [cmd, ...args] = input.split(/\s+/);
-    const def = commandLookup.get(cmd);
-    if (!def || disabled.has(cmd)) {
-      appendLine(`${cmd}: command not found  (type 'help' for commands)`, 'ol-err');
+    const def = this.commandLookup.get(cmd);
+    if (!def || this.disabled.has(cmd)) {
+      this.appendLine(`${cmd}: command not found  (type 'help' for commands)`, 'ol-err');
       return;
     }
     def.run(args, cmd);
   }
 
-  function tabComplete(val: string): string {
+  private tabComplete(val: string): string {
     const parts = val.trimStart().split(/\s+/);
     const cmd = parts[0];
     const arg = parts[1] ?? '';
 
     if (parts.length === 1) {
-      const allNames = [...commandLookup.keys()].filter(c => !disabled.has(c));
+      const allNames = [...this.commandLookup.keys()].filter(c => !this.disabled.has(c));
       const ms = allNames.filter(c => c.startsWith(cmd));
       if (ms.length === 1) return ms[0] + ' ';
-      if (ms.length > 1) { echoInput(val); appendLine('  ' + ms.join('  '), 'ol-muted'); }
+      if (ms.length > 1) { this.echoInput(val); this.appendLine('  ' + ms.join('  '), 'ol-muted'); }
       return val;
     }
 
     if (cmd === 'cd' || cmd === 'ls') {
       const dirArg = parts.slice(1).find(p => !p.startsWith('-')) ?? '';
       const slash = dirArg.lastIndexOf('/');
-      const dirPart = slash === -1 ? cwd : resolvePath(cwd, dirArg.slice(0, slash) || '/');
+      const dirPart = slash === -1 ? this.cwd : resolvePath(this.cwd, dirArg.slice(0, slash) || '/');
       const prefix  = slash === -1 ? dirArg : dirArg.slice(slash + 1);
       const pathPrefix = slash === -1 ? '' : dirArg.slice(0, slash + 1);
-      const targetNode = fs[dirPart];
+      const targetNode = this.fs[dirPart];
       if (!targetNode) return val;
       const ms = targetNode.dirs.filter(d => d.startsWith(prefix));
       const flags = parts.slice(1).filter(p => p.startsWith('-')).join(' ');
       const flagStr = flags ? flags + ' ' : '';
       if (ms.length === 1) return `${cmd} ${flagStr}${pathPrefix}${ms[0]}/`;
-      if (ms.length > 1) { echoInput(val); appendLine('  ' + ms.join('  '), 'ol-muted'); }
+      if (ms.length > 1) { this.echoInput(val); this.appendLine('  ' + ms.join('  '), 'ol-muted'); }
       return val;
     }
 
     if (cmd === 'cat' || cmd === 'view' || cmd === 'open') {
-      const { dir, file: prefix } = resolveArg(arg);
-      const targetNode = fs[dir];
+      const { dir, file: prefix } = this.resolveArg(arg);
+      const targetNode = this.fs[dir];
       if (!targetNode) return val;
       const pathPrefix = arg.includes('/') ? arg.slice(0, arg.lastIndexOf('/') + 1) : '';
       const fileMs = targetNode.files.map(f => f.name).filter(n => n.startsWith(prefix));
@@ -346,55 +364,41 @@ export function attachTerminal(opts: AttachOptions): TerminalHandle {
       if (fileMs.length === 1 && dirMs.length === 0) return `${cmd} ${pathPrefix}${fileMs[0]}`;
       if (dirMs.length === 1  && fileMs.length === 0) return `${cmd} ${pathPrefix}${dirMs[0]}/`;
       const all = [...dirMs.map(d => d + '/'), ...fileMs];
-      if (all.length > 1) { echoInput(val); appendLine('  ' + all.join('  '), 'ol-muted'); }
+      if (all.length > 1) { this.echoInput(val); this.appendLine('  ' + all.join('  '), 'ol-muted'); }
       return val;
     }
 
     return val;
   }
 
-  appendLine("Welcome to the terminal. Type 'help' for available commands.", 'ol-muted');
-  appendLine('', '');
-  promptEl.textContent = promptText();
-
-  const onKeydown = (e: KeyboardEvent) => {
+  private onKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
-      const val = inputEl.value;
-      inputEl.value = '';
-      execute(val);
+      const val = this.inputEl.value;
+      this.inputEl.value = '';
+      this.execute(val);
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      inputEl.value = tabComplete(inputEl.value);
+      this.inputEl.value = this.tabComplete(this.inputEl.value);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (historyIdx < cmdHistory.length - 1) {
-        historyIdx++;
-        inputEl.value = cmdHistory[historyIdx];
+      if (this.historyIdx < this.cmdHistory.length - 1) {
+        this.historyIdx++;
+        this.inputEl.value = this.cmdHistory[this.historyIdx];
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      if (historyIdx > 0) {
-        historyIdx--;
-        inputEl.value = cmdHistory[historyIdx];
+      if (this.historyIdx > 0) {
+        this.historyIdx--;
+        this.inputEl.value = this.cmdHistory[this.historyIdx];
       } else {
-        historyIdx = -1;
-        inputEl.value = '';
+        this.historyIdx = -1;
+        this.inputEl.value = '';
       }
     }
   };
 
-  const onClick = () => {
+  private onClick = () => {
     if (window.getSelection()?.toString()) return;
-    inputEl.focus();
-  };
-
-  inputEl.addEventListener('keydown', onKeydown);
-  termEl.addEventListener('click', onClick);
-
-  return {
-    destroy() {
-      inputEl.removeEventListener('keydown', onKeydown);
-      termEl.removeEventListener('click', onClick);
-    },
+    this.inputEl.focus();
   };
 }

@@ -123,7 +123,7 @@ const { prompt = 'user@site', pages = [], collections = [], disabledCommands = [
 </style>
 
 <script>
-  import { attachTerminal } from 'site-shell-core';
+  import { Terminal } from 'site-shell-core';
   import type { FileEntry, Collection } from 'site-shell-core';
 
   document.querySelectorAll<HTMLElement>('.terminal[data-pages]').forEach(termEl => {
@@ -132,15 +132,6 @@ const { prompt = 'user@site', pages = [], collections = [], disabledCommands = [
     const promptLabel = termEl.dataset.prompt;
     const disabledCommands: string[] = JSON.parse(termEl.dataset.disabledCommands ?? '[]');
 
-    attachTerminal({
-      root:             termEl,
-      output:           termEl.querySelector('.terminal-output')!,
-      input:            termEl.querySelector<HTMLInputElement>('.terminal-input')!,
-      prompt:           termEl.querySelector('.terminal-prompt')!,
-      pages,
-      collections,
-      promptLabel,
-      disabledCommands,
-    });
+    (termEl as any)._terminal = new Terminal(termEl, { pages, collections, promptLabel, disabledCommands });
   });
 </script>
