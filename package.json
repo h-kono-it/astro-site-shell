@@ -2,6 +2,10 @@
   "name": "astro-site-shell-workspace",
   "private": true,
   "type": "module",
+  "scripts": {
+    "publish:core": "pnpm publish --filter site-shell-core",
+    "publish:astro": "pnpm publish --filter astro-site-shell"
+  },
   "pnpm": {
     "onlyBuiltDependencies": ["esbuild", "sharp"]
   }
