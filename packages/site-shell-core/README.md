@@ -51,12 +51,22 @@ terminal.destroy();
 | `pages` | `FileEntry[]` | — | Top-level pages |
 | `collections` | `Collection[]` | — | Collections, each mapped to a subdirectory |
 | `disabledCommands` | `string[]` | — | Commands to disable (e.g. `['sl', 'open']`) |
+| `customCommands` | `CustomCommand[]` | — | Custom commands to register at init |
 
 ### `Terminal` instance
 
 | Method | Description |
 |---|---|
 | `destroy()` | Remove all event listeners |
+| `addCommand(cmd)` | Register a custom command at runtime |
+
+### `CustomCommand`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ✓ | Command name |
+| `run` | `(args: string[]) => string \| string[] \| void` | ✓ | Handler. Return a string or string[] to print output |
+| `description` | `string` | — | Description shown in `help` |
 
 ## HTML structure
 

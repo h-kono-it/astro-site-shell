@@ -1,11 +1,18 @@
 import type { FileEntry, Collection } from './types.js';
 import { buildFs, resolvePath, esc, fmtDate } from './fs.js';
 
+export interface CustomCommand {
+  name: string;
+  run: (args: string[]) => string | string[] | void;
+  description?: string;
+}
+
 export interface TerminalOptions {
   pages?: FileEntry[];
   collections?: Collection[];
   promptLabel?: string;
   disabledCommands?: string[];
+  customCommands?: CustomCommand[];
 }
 
 interface CommandDef {
@@ -36,6 +43,7 @@ export class Terminal {
       collections = [],
       promptLabel = 'user@site',
       disabledCommands = [],
+      customCommands = [],
     } = opts;
 
     this.termEl    = root;
@@ -51,6 +59,8 @@ export class Terminal {
       for (const name of def.names) this.commandLookup.set(name, def);
     }
 
+    for (const cmd of customCommands) this.addCommand(cmd);
+
     this.appendLine("Welcome to the terminal. Type 'help' for available commands.", 'ol-muted');
     this.appendLine('', '');
     this.promptEl.textContent = this.promptText();
@@ -62,6 +72,23 @@ export class Terminal {
   destroy(): void {
     this.inputEl.removeEventListener('keydown', this.onKeydown);
     this.termEl.removeEventListener('click', this.onClick);
+  }
+
+  addCommand(cmd: CustomCommand): void {
+    const def: CommandDef = {
+      names: [cmd.name],
+      run: (args) => {
+        const result = cmd.run(args);
+        if (typeof result === 'string') {
+          this.appendLine(result);
+        } else if (Array.isArray(result)) {
+          result.forEach(line => this.appendLine(line));
+        }
+      },
+      helpRows: cmd.description ? [[cmd.name, cmd.description]] : undefined,
+    };
+    this.commandDefs.push(def);
+    this.commandLookup.set(cmd.name, def);
   }
 
   private promptText() {

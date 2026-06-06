@@ -73,6 +73,30 @@ const posts = await getCollection('posts');
 | `name` | `string` | Directory name in the terminal (e.g. `'posts'`) |
 | `entries` | `FileEntry[]` | List of entries in the collection |
 
+## Custom commands
+
+Astro components cannot accept functions as props, so custom commands are registered via the `_terminal` instance exposed on the root element after initialization.
+
+```astro
+---
+import { CliTerminal } from 'astro-site-shell';
+---
+
+<CliTerminal pages={pages} collections={collections} />
+
+<script>
+  document.querySelectorAll('.terminal').forEach(el => {
+    el._terminal?.addCommand({
+      name: 'hello',
+      run: () => 'Hello, world!',
+      description: 'Say hello',
+    });
+  });
+</script>
+```
+
+For non-Astro frameworks, pass `customCommands` directly to `new Terminal()` or use `addCommand()` after initialization. See [`site-shell-core`](https://www.npmjs.com/package/site-shell-core) for details.
+
 ## Commands
 
 | Command | Description |

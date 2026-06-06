@@ -70,9 +70,11 @@ const collections: Collection[] = [
       <a href="https://github.com/h-kono-it/astro-site-shell" target="_blank" rel="noopener">GitHub</a>
     </div>
     <section>
-      <h1>Default</h1>
-      <p>全コマンド有効</p>
-      <CliTerminal pages={pages} collections={collections} />
+      <h1>Default + addCommand()</h1>
+      <p>greet コマンドを addCommand() で追加（usage: greet &lt;name&gt;）</p>
+      <div id="terminal-with-cmd">
+        <CliTerminal pages={pages} collections={collections} />
+      </div>
     </section>
 
     <section>
@@ -186,6 +188,25 @@ const collections: Collection[] = [
     },
   ];
 
+  // CliTerminal の addCommand() デモ
+  const termEl = document.querySelector('#terminal-with-cmd .terminal') as any;
+  termEl?._terminal?.addCommand({
+    name: 'greet',
+    run: (args: string[]) => `Hello, ${args[0] ?? 'world'}!`,
+    description: 'Say hello (usage: greet <name>)',
+  });
+
   const el = document.getElementById('raw-terminal') as HTMLElement;
-  (el as any)._terminal = new Terminal(el, { pages, collections, promptLabel: 'raw@terminal' });
+  (el as any)._terminal = new Terminal(el, {
+    pages,
+    collections,
+    promptLabel: 'raw@terminal',
+    customCommands: [
+      {
+        name: 'greet',
+        run: (args) => `Hello, ${args[0] ?? 'world'}!`,
+        description: 'Say hello (usage: greet <name>)',
+      },
+    ],
+  });
 </script>
